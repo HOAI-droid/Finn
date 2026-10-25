@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Finn der Fennek</title>
+<link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon-192.png"><meta name="theme-color" content="#ee7b24">
+<style>
+  :root { --bg:#eaf2f7; --panel:#ffffff; --ink:#1d2b36; --muted:#5d7283; --accent:#ee7b24; --line:#d5e2ea; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#16232c; --panel:#1e303b; --ink:#e8f1f6; --muted:#97aebd; --line:#2d4553; } }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.4 system-ui, sans-serif; color:var(--ink); background:var(--bg); display:flex; height:100vh; }
+  #stage { flex:1; position:relative; min-width:0; }
+  canvas { display:block; width:100%; height:100%; }
+  #panel { width:340px; overflow:auto; background:var(--panel); border-left:1px solid var(--line); padding:14px 16px 30px; }
+  h1 { font-size:16px; margin:0 0 10px; } h2 { font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:16px 0 6px; }
+  .row { display:flex; flex-wrap:wrap; gap:6px; }
+  button { font:inherit; color:var(--ink); background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:5px 10px; cursor:pointer; }
+  button:hover { border-color:var(--accent); } button.on { background:var(--accent); border-color:var(--accent); color:#fff; }
+  textarea { width:100%; font:inherit; border:1px solid var(--line); border-radius:8px; padding:8px; background:var(--bg); color:var(--ink); resize:vertical; }
+  #pad { width:120px; height:120px; border:1px solid var(--line); border-radius:10px; background:var(--bg); position:relative; touch-action:none; }
+  #dot { position:absolute; width:14px; height:14px; border-radius:50%; background:var(--accent); transform:translate(-50%,-50%); left:50%; top:50%; }
+  input[type=text], input:not([type]) { font:inherit; border:1px solid var(--line); border-radius:8px; padding:5px 8px; background:var(--bg); color:var(--ink); width:150px; }
+  #result { margin-top:6px; min-height:20px; color:var(--muted); } #reader { line-height:1.7; border:1px solid var(--line); border-radius:8px; padding:8px; background:var(--bg); } #reader span.w.on { background:var(--accent); color:#fff; border-radius:4px; }
+  select { font:inherit; color:var(--ink); background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:5px 8px; max-width:190px; }
+  #chatlog { margin-top:8px; max-height:190px; overflow:auto; font-size:13px; } #chatlog div { padding:3px 0; } #chatlog .du { color:var(--muted); } #chatlog .finn { color:var(--ink); font-weight:600; } #chatlog .fehler { color:#c0392b; }
+  button.rec { background:#c0392b; border-color:#c0392b; color:#fff; }
+  label { display:flex; align-items:center; gap:6px; color:var(--muted); }
+  #msg { position:absolute; left:12px; bottom:10px; color:var(--muted); font-size:12px; }
+  @media (max-width:760px) { body { flex-direction:column; } #panel { width:100%; height:48vh; border-left:0; border-top:1px solid var(--line); } #stage { height:52vh; flex:none; } }
+</style>
+<script type="importmap">{ "imports": { "three": "./lib/three.module.js", "three/addons/": "./lib/jsm/" } }</script>
+</head>
+<body>
+<div id="stage"><div id="msg">Lade Modell …</div></div>
+<div id="panel">
+  <h1>Finn der Fennek</h1>
+  <div id="updbar" style="display:none;margin:-4px 0 10px;font-size:12px;color:var(--muted)"><span id="updtxt"></span> <button id="updbtn" style="padding:2px 8px">Nach Updates suchen</button></div>
+  <h2>Englisch lernen (3. Klasse)</h2>
+  <div class="row"><select id="ltopic"></select><select id="lmode"><option value="mix">Sprechen &amp; Tippen gemischt</option><option value="type">Nur Tippen</option><option value="speak">Nur Sprechen</option><option value="listen">Hören &amp; Tippen</option></select><button id="lstart">Start</button></div>
+  <div id="lcard" style="display:none;margin-top:8px;padding:10px;border-radius:12px;background:rgba(255,255,255,.05);text-align:center">
+    <div id="lprog" style="font-size:12px;color:var(--muted)"></div>
+    <div id="lvis" style="font-size:72px;line-height:1.2;min-height:90px"></div>
+    <div id="lq" style="font-weight:700;margin:4px 0"></div>
+    <div id="lhint" style="letter-spacing:4px;font-size:20px;min-height:28px"></div>
+    <div class="row" id="lanswer" style="justify-content:center">
+      <input id="lin" placeholder="English word …" autocomplete="off" autocapitalize="none" spellcheck="false" style="font-size:18px">
+      <button id="lcheck">Prüfen</button>
+      <button id="lmic">🎤 Halten zum Sprechen</button>
+    </div>
+    <div class="row" style="justify-content:center;margin-top:6px"><button id="lrepeat">🔊 Nochmal hören</button><button id="lskip">Weiter / Lösung</button><button id="lstop">Beenden</button></div>
+    <div id="lfb" style="margin-top:8px;min-height:22px"></div>
+  </div>
+  <h2>Gespräch (lokale KI)</h2>
+  <div class="row"><select id="model"></select><button id="loadm">Modell laden</button></div>
+  <div id="prog" style="margin:6px 0;color:var(--muted);font-size:12px">Ohne Modell antwortet Finn nur mit festen Sätzen.</div>
+  <div class="row"><button id="mic">🎤 Halten zum Sprechen</button><label><input type="checkbox" id="mute">stumm</label></div>
+  <div class="row" style="margin-top:6px"><input id="say" placeholder="oder hier tippen …" autocomplete="off"><button id="send">Senden</button></div>
+  <div id="chatlog"></div>
+  <h2>Stimme</h2>
+  <div class="row"><button id="loadpair">Fennek-Stimme laden</button></div>
+  <div id="vprog" style="margin:6px 0;color:var(--muted);font-size:12px">Einmaliger Download (ca. 130 MB), danach spricht Finn Deutsch und Englisch mit passenden Stimmen, ganz ohne Internet.</div>
+  <details style="margin-bottom:8px"><summary style="color:var(--muted);font-size:12px">Entwickler: einzelne Stimmen</summary>
+    <div class="row" style="margin-top:6px"><select id="voice"></select><button id="loadv">Deutsch laden</button></div>
+    <div class="row" style="margin-top:6px"><select id="voiceEn"></select><button id="loadvEn">Englisch laden</button></div>
+    <div class="row" style="margin-top:6px"><label>Tonhöhe <input type="range" id="pitch" min="0.85" max="1.7" step="0.01" value="1"></label></div>
+  </details>
+  <h2>Vorlesen</h2>
+  <textarea id="txt" rows="4">Es war einmal ein kleiner Fennek, der hatte riesige Ohren. Jeden Abend lauschte er den Geräuschen der Wüste. Plötzlich hörte er ein leises Kichern hinter der Düne!</textarea>
+  <div class="row" style="margin-top:6px"><button id="read">Vorlesen</button><button id="speakSilent">Nur Mund (stumm)</button><button id="stop">Stopp</button></div>
+  <div id="reader" style="display:none;margin-top:6px"></div>
+  <h2>Diktat-Demo</h2>
+  <div class="row"><input id="target" readonly> <button id="newword">Neues Wort</button><button id="hear">Hören</button></div>
+  <div class="row" style="margin-top:6px"><input id="typed" placeholder="Wort richtig tippen …" autocomplete="off" autocapitalize="off" spellcheck="false"><button id="check">Prüfen</button></div>
+  <div id="result"></div>
+  <h2>Reaktionen</h2><div class="row" id="reacts"></div>
+  <h2>Gefühl</h2><div class="row" id="emos"></div>
+  <h2>Körper</h2><div class="row" id="body"></div>
+  <h2>Kamera</h2><div class="row"><button data-cam="face">Gesicht</button><button data-cam="half">Halbtotale</button><button data-cam="full">Ganzkörper</button></div>
+  <h2>Augen &amp; Blick</h2>
+  <div class="row" id="eyes"></div>
+  <div style="display:flex;gap:14px;align-items:center;margin-top:8px"><div id="pad"><div id="dot"></div></div>
+    <div><label><input type="checkbox" id="autoBlink" checked>Blinzeln</label><label><input type="checkbox" id="autoEars" checked>Ohrzucken</label><label><input type="checkbox" id="autoIdle" checked>Idle-Bewegung</label></div></div>
+  <h2>Brauen</h2><div class="row" id="brows"></div>
+  <h2>Mund (Visemes &amp; Ausdrücke)</h2><div class="row" id="mouth"></div>
+</div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { FennecAvatar } from './avatar.js';
+import { FennecChat, Listener, MODELS } from './chat.js';
+
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.NeutralToneMapping; renderer.toneMappingExposure = 1.0;
+stage.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = 0.75;
+const key = new THREE.DirectionalLight(0xfff2e0, 1.4); key.position.set(1.5, 2.5, 2.5); scene.add(key);
+const camera = new THREE.PerspectiveCamera(30, 1, 0.05, 50);
+const controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping = true;
+const CAMS = { face: [[0, 1.30, 1.9], [0, 1.22, 0]], half: [[0, 1.15, 3.0], [0, 1.05, 0]], full: [[0, 0.95, 5.0], [0, 0.82, 0]] };
+function cam(name) { const [p, t] = CAMS[name]; camera.position.set(...p); controls.target.set(...t); controls.update(); }
+function resize() { const w = stage.clientWidth, h = stage.clientHeight; renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+addEventListener('resize', resize); resize();
+
+const avatar = new FennecAvatar(); window.avatar = avatar; window.cam = cam; window.camera = camera; window.controls = controls;
+await avatar.load('./fennec_avatar.glb', './atlas_meta.json');
+scene.add(avatar.root);
+// Figur schaut in -Y (Blender) -> glTF +Z; Kamera vor die Figur
+cam('face');
+document.getElementById('msg').textContent = 'Ziehen = drehen, Mausrad = zoomen';
+
+function mkButtons(id, items, fn) {
+  const el = document.getElementById(id);
+  for (const n of items) { const b = document.createElement('button'); b.textContent = n; b.onclick = () => fn(n, b); el.appendChild(b); }
+}
+mkButtons('emos', avatar.emotions, (n) => avatar.setEmotion(n));
+mkButtons('body', ['Idle', ...avatar.bodyAnimations], (n) => n === 'Idle' ? avatar.stopBody() : avatar.playBody(n));
+mkButtons('eyes', avatar.meta.eyes.states, (n) => avatar.setEyes(n));
+mkButtons('brows', avatar.meta.brows.states, (n) => avatar.setBrows(n));
+mkButtons('mouth', avatar.meta.mouth.states, (n) => { avatar.stopSpeaking(); avatar.setMouth(n); });
+document.querySelectorAll('[data-cam]').forEach(b => b.onclick = () => cam(b.dataset.cam));
+const txt = document.getElementById('txt');
+
+for (const k of ['autoBlink', 'autoEars', 'autoIdle']) document.getElementById(k).onchange = (e) => avatar[k] = e.target.checked;
+const pad = document.getElementById('pad'), dot = document.getElementById('dot');
+function gz(e) { const r = pad.getBoundingClientRect(); const x = clamp((e.clientX - r.left) / r.width * 2 - 1), y = clamp(-((e.clientY - r.top) / r.height * 2 - 1));
+  dot.style.left = (x + 1) * 50 + '%'; dot.style.top = (1 - y) * 50 + '%'; avatar.gazeUser = [x, y]; avatar.setGaze(x, y); }
+function clamp(v) { return Math.max(-1, Math.min(1, v)); }
+pad.onpointerdown = (e) => { pad.setPointerCapture(e.pointerId); gz(e); pad.onpointermove = gz; };
+pad.onpointerup = () => { pad.onpointermove = null; };
+if ('speechSynthesis' in window) speechSynthesis.getVoices();
+mkButtons('reacts', avatar.reactions, (n) => avatar.react(n));
+// ---- Diktat-Demo: richtig geschrieben -> Fennek spricht das Wort; falsch -> er schweigt und macht Quatsch
+const WORDS = ['Schmetterling', 'Fahrrad', 'Känguru', 'Wassermelone', 'Fennek', 'Spaziergang', 'Eichhörnchen', 'Regenbogen'];
+const target = document.getElementById('target'), typed = document.getElementById('typed'), result = document.getElementById('result');
+const newWord = () => { target.value = WORDS[Math.floor(Math.random() * WORDS.length)]; typed.value = ''; result.textContent = ''; };
+// Hinweis: im echten Spiel wird das Zielwort nicht angezeigt, sondern z. B. als Bild/Aufgabe gestellt.
+document.getElementById('newword').onclick = newWord; newWord();
+document.getElementById('hear').onclick = () => avatar.speak(target.value);
+function check() {
+  if (typed.value === target.value) { result.textContent = '✔ Richtig!'; avatar.setEmotion('happy'); avatar.speak(target.value, { rate: .9, onend: () => { avatar.react('nod'); } }); }
+  else { result.textContent = '✘ Nicht ganz …'; avatar.stopSpeaking(); avatar.react(['eyeroll', 'shake', 'oops', 'think'][Math.floor(Math.random() * 4)]); }
+}
+document.getElementById('check').onclick = check; typed.onkeydown = (e) => { if (e.key === 'Enter') check(); };
+// ---- Vorlesen mit Wort-Hervorhebung (ein Textfeld für alles)
+const reader = document.getElementById('reader');
+function buildReader(text) {
+  let idx = 0; reader.style.display = 'block'; txt.style.display = 'none';
+  reader.innerHTML = text.split(/(\s+)/).map(t => { const h = /^\s+$/.test(t) ? t.replace(/\n/g, '<br>') : `<span class="w" data-s="${idx}" data-e="${idx + t.length}">${t.replace(/</g, '&lt;')}</span>`; idx += t.length; return h; }).join('');
+}
+avatar.onWord = (ci) => { reader.querySelectorAll('.w').forEach(w => w.classList.toggle('on', +w.dataset.s <= ci && ci < +w.dataset.e)); };
+const showEditor = () => { reader.style.display = 'none'; txt.style.display = ''; };
+const clearHi = () => { reader.querySelectorAll('.w.on').forEach(w => w.classList.remove('on')); showEditor(); };
+reader.onclick = () => { avatar.stopSpeaking(); clearHi(); };
+const readNow = (silent) => { chat.stop(); buildReader(txt.value); avatar.speakLong(txt.value, { rate: .95, silent, onend: clearHi }); };
+document.getElementById('read').onclick = () => readNow(false);
+document.getElementById('speakSilent').onclick = () => readNow(true);
+document.getElementById('stop').onclick = () => { avatar.stopSpeaking(); clearHi(); };
+
+// ---- Stimme (Piper)
+import { PiperTTS, VOICES } from './tts.js';
+const vsel = document.getElementById('voice'), vprog = document.getElementById('vprog');
+const vselEn = document.getElementById('voiceEn');
+VOICES.forEach(v => { const o = document.createElement('option'); o.value = v.id; o.textContent = v.label; (v.lang === 'en' ? vselEn : vsel).appendChild(o); });
+const piper = new PiperTTS(); window.piper = piper;
+document.getElementById('loadv').onclick = async (e) => {
+  e.target.disabled = true; vprog.textContent = 'Lade …';
+  try { const id = await piper.load(vsel.value, (p) => { vprog.textContent = p.text; }); setPitch(/thorsten/.test(id) ? 1.3 : 1.18); avatar.tts = piper; vprog.textContent = 'Piper-Stimme aktiv: ' + id; avatar.speak('Hallo, ich bin Finn!'); }
+  catch (err) { console.error(err); avatar.tts = null; vprog.textContent = '⚠ ' + (err.message || err) + ' – Browser-Stimme bleibt aktiv.'; }
+  e.target.disabled = false;
+};
+const piperEn = new PiperTTS(); window.piperEn = piperEn;
+document.getElementById('loadvEn').onclick = async (e) => {
+  e.target.disabled = true; vprog.textContent = 'Lade …';
+  try { const id = await piperEn.load(vselEn.value, (p) => { vprog.textContent = p.text; }); avatar.ttsEn = piperEn; vprog.textContent = 'Englische Piper-Stimme aktiv: ' + id; avatar.speak('Hello, I am Finn!', { lang: 'en-US' }); }
+  catch (err) { console.error(err); avatar.ttsEn = null; vprog.textContent = '⚠ ' + (err.message || err) + ' – Browser-Stimme bleibt aktiv.'; }
+  e.target.disabled = false;
+};
+const pitchEl = document.getElementById('pitch');
+pitchEl.oninput = (e) => { avatar.voicePitch = +e.target.value; };
+avatar.onTTSError = (e) => { vprog.textContent = '⚠ Sprachausgabe-Fehler: ' + (e.message || e); };
+// kindlichere Stimme: höher abspielen, dabei Tempo per Längenskala ausgleichen
+const setPitch = (v) => { pitchEl.value = v; avatar.voicePitch = v; };
+// ---- festes Stimmenpaar für Kinder: Ramona (de) + Jenny (en), ein Klick, läuft im Hintergrund
+const PAIR = { de: 'de_DE-ramona-low', en: 'en_GB-jenny_dioco-medium', pitch: 1.15 };
+const btnPair = document.getElementById('loadpair');
+async function loadPair(greet) {
+  btnPair.disabled = true;
+  try {
+    await piper.load(PAIR.de, (p) => { vprog.textContent = '1/2 Deutsch: ' + p.text; });
+    await piperEn.load(PAIR.en, (p) => { vprog.textContent = '2/2 Englisch: ' + p.text; });
+    setPitch(PAIR.pitch); avatar.tts = piper; avatar.ttsEn = piperEn; btnPair.style.display = 'none';
+    vprog.textContent = '✔ Fennek-Stimme bereit';
+    if (greet) avatar.speak('Hallo, ich bin Finn!');
+  } catch (err) { console.error(err); avatar.tts = avatar.ttsEn = null; btnPair.disabled = false; vprog.textContent = '⚠ ' + (err.message || err) + ' – Browser-Stimme bleibt aktiv.'; }
+}
+btnPair.onclick = () => loadPair(true);
+// schon heruntergeladen? Dann automatisch im Hintergrund starten
+(async () => { try {
+  const c = await caches.open('fennec-piper-v1'), ks = (await c.keys()).map(r => r.url);
+  if (ks.some(u => u.includes(PAIR.de + '.onnx')) && ks.some(u => u.includes(PAIR.en + '.onnx'))) loadPair(false);
+} catch (e) { /* ohne Cache-API: Knopf bleibt */ } })();
+
+// ---- Englisch lernen
+import { EnglishTrainer, TOPICS } from './learn.js';
+const $ = (id) => document.getElementById(id);
+const ltopic = $('ltopic'); [['all', 'Alles gemischt']].concat(Object.entries(TOPICS).map(([k, v]) => [k, v.label])).forEach(([k, l]) => { const o = document.createElement('option'); o.value = k; o.textContent = l; ltopic.appendChild(o); });
+const lfb = $('lfb'), lhint = $('lhint');
+const mask = (en, n) => en.split('').map((ch, i) => ch === ' ' ? '  ' : i < n ? ch : '_').join(' ');
+const trainer = new EnglishTrainer(avatar, { show(s) {
+    $('lcard').style.display = s ? 'block' : 'none'; if (!s) return;
+    const w = s.word; const v = $('lvis'); v.textContent = ''; v.style.background = ''; v.style.borderRadius = '';
+    if (s.kind === 'listen') v.textContent = '🔊'; else if (w.c) { v.innerHTML = '<div style="display:inline-block;width:90px;height:90px;border-radius:50%;border:3px solid #fff3;background:' + w.c + '"></div>'; } else v.textContent = w.big;
+    $('lq').textContent = s.question; $('lprog').textContent = s.progress + '   ⭐ ' + s.stars; lhint.textContent = mask(w.en, 0); lfb.textContent = ''; $('lin').value = '';
+    const speakMode = s.kind === 'speak'; $('lin').style.display = speakMode ? 'none' : ''; $('lcheck').style.display = speakMode ? 'none' : ''; $('lmic').style.display = speakMode ? '' : 'none';
+    if (!speakMode) setTimeout(() => $('lin').focus(), 50);
+  },
+  heard(t) { if (t) lfb.textContent = t; },
+  correct(w, stars) { lfb.textContent = '✔ ' + w.en + ' = ' + w.de; lhint.textContent = w.en.split('').join(' '); $('lprog').textContent += ' → ⭐ ' + stars; },
+  wrong(tries, en) { lfb.textContent = '✘ Nicht ganz …'; lhint.textContent = tries >= 2 ? mask(en, tries - 1) : mask(en, 0); },
+  reveal(w) { lfb.textContent = 'Das Wort heißt: ' + w.en + ' (' + w.de + ')'; lhint.textContent = w.en.split('').join(' '); },
+  finish(stars, total) { lfb.textContent = '🎉 Runde geschafft! ⭐ ' + stars + ' von ' + total; $('lvis').textContent = '🏆'; $('lq').textContent = ''; lhint.textContent = ''; $('lanswer').style.display = 'none'; },
+});
+window.trainer = trainer;
+const lis = new Listener((t) => trainer.answer(t, true), (s) => { if (s) lfb.textContent = s; }, 'en-US');
+$('lstart').onclick = () => { $('lanswer').style.display = ''; trainer.start(ltopic.value, $('lmode').value); };
+$('lcheck').onclick = () => trainer.answer($('lin').value, false);
+$('lin').onkeydown = (e) => { if (e.key === 'Enter') trainer.answer($('lin').value, false); };
+$('lrepeat').onclick = () => trainer.repeat(); $('lskip').onclick = () => trainer.skip(); $('lstop').onclick = () => trainer.stop();
+const lm = $('lmic'); if (!lis.ok) { lm.disabled = true; lm.textContent = '🎤 nicht verfügbar (bitte Chrome)'; }
+lm.onpointerdown = () => { avatar.stopSpeaking(); avatar.earTarget = [.7, 0]; lm.classList.add('rec'); lis.start(); };
+lm.onpointerup = () => { lm.classList.remove('rec'); lis.stop(); avatar.earTarget = [0, 0]; };
+lm.onpointerleave = () => { if (lis.active) { lm.classList.remove('rec'); lis.stop(); } };
+
+// ---- Gespräch
+const chatlog = document.getElementById('chatlog'), prog = document.getElementById('prog');
+const addLog = (who, t) => { const d = document.createElement('div'); d.className = who; d.textContent = (who === 'du' ? 'Du: ' : who === 'finn' ? 'Finn: ' : '') + t; chatlog.appendChild(d); chatlog.scrollTop = 1e9; };
+const mock = new URLSearchParams(location.search).has('mock');
+const chat = new FennecChat(avatar, { mock, log: addLog }); window.chat = chat;
+const sel = document.getElementById('model'); MODELS.forEach(m => { const o = document.createElement('option'); o.value = m.id; o.textContent = m.label; sel.appendChild(o); });
+document.getElementById('loadm').onclick = async (e) => {
+  e.target.disabled = true; prog.textContent = 'Lade …';
+  try { const id = await chat.loadModel(sel.value, (p) => { prog.textContent = p.text + ' (' + Math.round((p.progress || 0) * 100) + '%)'; }); prog.textContent = 'Modell bereit: ' + id; }
+  catch (err) { prog.textContent = '⚠ ' + (err.message || err); e.target.disabled = false; }
+};
+document.getElementById('mute').onchange = (e) => chat.muted = e.target.checked;
+const sayIn = document.getElementById('say');
+const send = () => { const t = sayIn.value; sayIn.value = ''; chat.say(t); };
+document.getElementById('send').onclick = send; sayIn.onkeydown = (e) => { if (e.key === 'Enter') send(); };
+const mic = document.getElementById('mic');
+const listener = new Listener((t) => chat.say(t), (s) => { if (s) prog.textContent = s; });
+if (!listener.ok) { mic.disabled = true; mic.textContent = '🎤 nicht verfügbar (bitte Chrome nutzen)'; }
+const micDown = () => { chat.stop(); avatar.setEmotion('neutral'); avatar.earTarget = [.7, 0]; mic.classList.add('rec'); listener.start(); };
+const micUp = () => { mic.classList.remove('rec'); listener.stop(); avatar.earTarget = [0, 0]; };
+mic.onpointerdown = micDown; mic.onpointerup = micUp; mic.onpointerleave = () => { if (listener.active) micUp(); };
+
+// ---- Updates (nur geänderte Dateien werden nachgeladen)
+import { Updater, fmtMB } from './updater.js';
+const upd = new Updater(), updbar = document.getElementById('updbar'), updtxt = document.getElementById('updtxt'), updbtn = document.getElementById('updbtn');
+let pending = null;
+const showVer = () => { updtxt.textContent = upd.version ? 'Version ' + upd.version : ''; };
+async function runUpdate() {
+  updbtn.disabled = true;
+  try { await upd.apply(pending, (p) => { updtxt.textContent = (pending.first ? 'Lade Daten ' : 'Aktualisiere ') + Math.round(p.progress * 100) + '% (' + p.done + '/' + p.count + ')'; });
+    if (pending.first) { pending = null; showVer(); updbtn.textContent = 'Nach Updates suchen'; updbtn.disabled = false; } else { updtxt.textContent = 'Fertig – starte neu …'; setTimeout(() => location.reload(), 500); } }
+  catch (e) { console.error(e); updtxt.textContent = '⚠ ' + (e.message || e); updbtn.disabled = false; }
+}
+async function checkUpdate(manual) {
+  updbtn.disabled = true; if (manual) updtxt.textContent = 'Suche …';
+  const c = await upd.check(); updbtn.disabled = false;
+  if (!c) { showVer(); if (manual) updtxt.textContent += ' (kein Update-Server erreichbar)'; return; }
+  if (!c.changed.length && !c.removed.length) { pending = null; updbtn.textContent = 'Nach Updates suchen'; showVer(); if (manual) updtxt.textContent += ' – aktuell'; return; }
+  pending = c;
+  if (c.first) { updbtn.textContent = 'Offline-Paket laden (' + fmtMB(c.bytes) + ')'; updtxt.textContent = 'Für den Offline-Betrieb:'; runUpdate(); }   // Erstinstallation automatisch
+  else { updbtn.textContent = 'Update installieren (' + fmtMB(c.bytes) + ')'; updtxt.textContent = 'Neue Version ' + c.manifest.version + ' verfügbar.'; }
+}
+updbtn.onclick = () => pending && !pending.first ? runUpdate() : checkUpdate(true);
+if (upd.supported) { updbar.style.display = ''; showVer(); upd.register().then(() => checkUpdate(false)); }
+
+const clock = new THREE.Clock();
+window.step = (dt = 1 / 60) => { avatar.update(dt); controls.update(); renderer.render(scene, camera); };
+(function loop() { requestAnimationFrame(loop); avatar.update(Math.min(clock.getDelta(), .05)); controls.update(); renderer.render(scene, camera); })();
+window.ready = true;
+</script>
+</body>
+</html>

@@ -1,0 +1,106 @@
+{
+ "eyes": {
+  "file": "eyes_atlas.png",
+  "cell": [
+   320,
+   256
+  ],
+  "cols": 9,
+  "rows": 9,
+  "states": [
+   "open",
+   "half",
+   "blink",
+   "closed",
+   "happy",
+   "sad",
+   "angry",
+   "sleepy",
+   "surprised"
+  ],
+  "rectL": [
+   486,
+   1231,
+   800,
+   640
+  ],
+  "gazeUnit": [
+   85,
+   45
+  ],
+  "default": [
+   0,
+   4
+  ]
+ },
+ "brows": {
+  "file": "brows_atlas.png",
+  "cell": [
+   470,
+   260
+  ],
+  "cols": 4,
+  "rows": 2,
+  "states": [
+   "neutral",
+   "up",
+   "high",
+   "down",
+   "angry",
+   "sad",
+   "worried",
+   "skeptic"
+  ],
+  "rectL": [
+   400,
+   790,
+   940,
+   520
+  ],
+  "default": [
+   0,
+   0
+  ]
+ },
+ "mouth": {
+  "file": "mouth_atlas.png",
+  "cell": [
+   512,
+   224
+  ],
+  "cols": 5,
+  "rows": 4,
+  "states": [
+   "sil",
+   "PP",
+   "FF",
+   "TH",
+   "DD",
+   "kk",
+   "CH",
+   "SS",
+   "nn",
+   "RR",
+   "aa",
+   "E",
+   "I",
+   "O",
+   "U",
+   "smile",
+   "laugh",
+   "frown",
+   "surprised"
+  ],
+  "rectL": [
+   947.5,
+   2090,
+   1105,
+   483
+  ],
+  "default": [
+   0,
+   0
+  ]
+ },
+ "mirrorX": 1500.0
+}

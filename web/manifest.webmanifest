@@ -1,0 +1,2 @@
+{ "name": "Finn der Fennek", "short_name": "Finn", "start_url": "./", "display": "standalone", "background_color": "#16232c", "theme_color": "#ee7b24",
+  "icons": [{ "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }, { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }] }
