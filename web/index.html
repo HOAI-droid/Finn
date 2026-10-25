@@ -26,6 +26,8 @@
   #chatlog { margin-top:8px; max-height:190px; overflow:auto; font-size:13px; } #chatlog div { padding:3px 0; } #chatlog .du { color:var(--muted); } #chatlog .finn { color:var(--ink); font-weight:600; } #chatlog .fehler { color:#c0392b; }
   button.rec { background:#c0392b; border-color:#c0392b; color:#fff; }
   label { display:flex; align-items:center; gap:6px; color:var(--muted); }
+  .memgrid { display:grid; grid-template-columns:auto 1fr; gap:4px 8px; align-items:center; margin-top:8px; font-size:12px; color:var(--muted); } .memgrid input { width:100%; }
+  .memh { font-weight:600; margin-top:10px; font-size:12px; } .memitem { display:flex; gap:6px; align-items:flex-start; font-size:12px; padding:2px 0; } .memitem span { flex:1; } .memitem small { color:var(--muted); white-space:nowrap; } .memitem button { padding:0 6px; font-size:11px; }
   #msg { position:absolute; left:12px; bottom:10px; color:var(--muted); font-size:12px; }
   @media (max-width:760px) { body { flex-direction:column; } #panel { width:100%; height:48vh; border-left:0; border-top:1px solid var(--line); } #stage { height:52vh; flex:none; } }
 </style>
@@ -54,9 +56,16 @@
   <h2>Gespräch (lokale KI)</h2>
   <div class="row"><select id="model"></select><button id="loadm">Modell laden</button></div>
   <div id="prog" style="margin:6px 0;color:var(--muted);font-size:12px">Ohne Modell antwortet Finn nur mit festen Sätzen.</div>
-  <div class="row"><button id="mic">🎤 Halten zum Sprechen</button><label><input type="checkbox" id="mute">stumm</label></div>
+  <div class="row"><button id="greet">👋 Hallo Finn</button><button id="mic">🎤 Halten zum Sprechen</button><label><input type="checkbox" id="mute">stumm</label></div>
   <div class="row" style="margin-top:6px"><input id="say" placeholder="oder hier tippen …" autocomplete="off"><button id="send">Senden</button></div>
   <div id="chatlog"></div>
+  <details id="memdet" style="margin-top:8px"><summary style="color:var(--muted);font-size:12px">Eltern: Was Finn sich merkt</summary>
+    <div id="memprof" class="memgrid"></div>
+    <div class="memh">Gemerkt</div><div id="memfacts"></div>
+    <div class="memh">Frühere Gespräche</div><div id="memsess"></div>
+    <div class="row" style="margin-top:8px"><button id="memforget">Alles vergessen</button></div>
+    <div style="font-size:12px;color:var(--muted);margin-top:6px">Alles bleibt auf diesem Gerät (Browser-Speicher). Finn fragt nie nach Adresse oder Nachnamen; Sätze mit Straße, Telefonnummer o. Ä. werden nicht gespeichert.</div>
+  </details>
   <h2>Stimme</h2>
   <div class="row"><button id="loadpair">Fennek-Stimme laden</button></div>
   <div id="vprog" style="margin:6px 0;color:var(--muted);font-size:12px">Einmaliger Download (ca. 130 MB), danach spricht Finn Deutsch und Englisch mit passenden Stimmen, ganz ohne Internet.</div>
@@ -90,6 +99,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { FennecAvatar } from './avatar.js';
 import { FennecChat, Listener, MODELS } from './chat.js';
+import { FinnMemory, SLOTS } from './memory.js';
 
 const stage = document.getElementById('stage');
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
@@ -224,7 +234,7 @@ const trainer = new EnglishTrainer(avatar, { show(s) {
   correct(w, stars) { lfb.textContent = '✔ ' + w.en + ' = ' + w.de; lhint.textContent = w.en.split('').join(' '); $('lprog').textContent += ' → ⭐ ' + stars; },
   wrong(tries, en) { lfb.textContent = '✘ Nicht ganz …'; lhint.textContent = tries >= 2 ? mask(en, tries - 1) : mask(en, 0); },
   reveal(w) { lfb.textContent = 'Das Wort heißt: ' + w.en + ' (' + w.de + ')'; lhint.textContent = w.en.split('').join(' '); },
-  finish(stars, total) { lfb.textContent = '🎉 Runde geschafft! ⭐ ' + stars + ' von ' + total; $('lvis').textContent = '🏆'; $('lq').textContent = ''; lhint.textContent = ''; $('lanswer').style.display = 'none'; },
+  finish(stars, total) { memory.note('Hat Englisch geübt (' + ltopic.selectedOptions[0].textContent + '): ' + stars + ' von ' + total + ' Sternen.'); lfb.textContent = '🎉 Runde geschafft! ⭐ ' + stars + ' von ' + total; $('lvis').textContent = '🏆'; $('lq').textContent = ''; lhint.textContent = ''; $('lanswer').style.display = 'none'; },
 });
 window.trainer = trainer;
 const lis = new Listener((t) => trainer.answer(t, true), (s) => { if (s) lfb.textContent = s; }, 'en-US');
@@ -232,7 +242,9 @@ $('lstart').onclick = () => { $('lanswer').style.display = ''; trainer.start(lto
 $('lcheck').onclick = () => trainer.answer($('lin').value, false);
 $('lin').onkeydown = (e) => { if (e.key === 'Enter') trainer.answer($('lin').value, false); };
 $('lrepeat').onclick = () => trainer.repeat(); $('lskip').onclick = () => trainer.skip(); $('lstop').onclick = () => trainer.stop();
-const lm = $('lmic'); if (!lis.ok) { lm.disabled = true; lm.textContent = '🎤 nicht verfügbar (bitte Chrome)'; }
+const isApp = navigator.userAgent.includes('Electron'), noMic = isApp ? '🎤 in der App noch nicht – bitte tippen' : '🎤 nicht verfügbar (bitte Chrome)';
+const lm = $('lmic'); if (!lis.ok) { lm.disabled = true; lm.textContent = noMic; }
+if (!lis.ok) { $('lmode').querySelectorAll('option[value=mix],option[value=speak]').forEach(o => o.remove()); $('lmode').value = 'type'; }   // ohne Mikrofon nur Tippen/Hören
 lm.onpointerdown = () => { avatar.stopSpeaking(); avatar.earTarget = [.7, 0]; lm.classList.add('rec'); lis.start(); };
 lm.onpointerup = () => { lm.classList.remove('rec'); lis.stop(); avatar.earTarget = [0, 0]; };
 lm.onpointerleave = () => { if (lis.active) { lm.classList.remove('rec'); lis.stop(); } };
@@ -241,7 +253,36 @@ lm.onpointerleave = () => { if (lis.active) { lm.classList.remove('rec'); lis.st
 const chatlog = document.getElementById('chatlog'), prog = document.getElementById('prog');
 const addLog = (who, t) => { const d = document.createElement('div'); d.className = who; d.textContent = (who === 'du' ? 'Du: ' : who === 'finn' ? 'Finn: ' : '') + t; chatlog.appendChild(d); chatlog.scrollTop = 1e9; };
 const mock = new URLSearchParams(location.search).has('mock');
-const chat = new FennecChat(avatar, { mock, log: addLog }); window.chat = chat;
+const memory = await new FinnMemory().load(); window.memory = memory;
+const chat = new FennecChat(avatar, { mock, log: addLog, memory }); window.chat = chat;
+for (const t of memory.recentTurns(8)) addLog(t.who, t.text);   // laufendes Gespräch anzeigen
+chat.canNudge = () => $('lcard').style.display === 'none' && reader.style.display === 'none' && !listener.active;
+document.getElementById('greet').onclick = () => chat.greet();
+// ---- Elternbereich: Gedächtnis ansehen/ändern/löschen
+const memdet = $('memdet'), memprof = $('memprof'), memfacts = $('memfacts'), memsess = $('memsess');
+const fmtD = (t) => new Date(t).toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'numeric' });
+const el = (tag, txt, cls) => { const e = document.createElement(tag); if (txt != null) e.textContent = txt; if (cls) e.className = cls; return e; };
+function renderMem() {
+  if (!memdet.open || memdet.contains(document.activeElement) && document.activeElement.tagName === 'INPUT') return;
+  memprof.replaceChildren(); memfacts.replaceChildren(); memsess.replaceChildren();
+  for (const [k, v] of Object.entries(SLOTS)) {
+    const inp = el('input'); inp.value = memory.profile[k] ?? ''; inp.placeholder = '–';
+    inp.onchange = () => { const x = inp.value.trim(); memory.setProfile(k, /^(alter|klasse)$/.test(k) && /^\d+$/.test(x) ? +x : x); };
+    memprof.append(el('label', v.label), inp);
+  }
+  const facts = [...memory.facts].reverse();
+  if (!facts.length) memfacts.append(el('div', 'Noch nichts.', 'memitem'));
+  for (const f of facts) {
+    const row = el('div', null, 'memitem'), del = el('button', '✕'); del.title = 'Vergessen'; del.onclick = () => memory.removeFact(f.id);
+    const tag = f.kind === 'event' ? (f.asked ? ' ✔ nachgefragt' : ' 📅 fragt ab ' + fmtD(f.due) + ' nach') : '';
+    row.append(el('small', fmtD(f.ts)), el('span', f.text + tag), del); memfacts.append(row);
+  }
+  const ss = memory.sessions.filter(x => x.turns.length).slice(-10).reverse();
+  if (!ss.length) memsess.append(el('div', 'Noch keine.', 'memitem'));
+  for (const x of ss) { const row = el('div', null, 'memitem'); row.append(el('small', fmtD(x.start)), el('span', x.summary || x.turns.filter(t => t.who === 'du').map(t => t.text).slice(-3).join(' · ') || '(nur Finn)')); memsess.append(row); }
+}
+memory.onChange = renderMem; memdet.ontoggle = renderMem;
+$('memforget').onclick = async () => { if (confirm('Soll Finn wirklich alles über dieses Kind vergessen?')) { await memory.forget(); chat.history = []; chatlog.replaceChildren(); } };
 const sel = document.getElementById('model'); MODELS.forEach(m => { const o = document.createElement('option'); o.value = m.id; o.textContent = m.label; sel.appendChild(o); });
 document.getElementById('loadm').onclick = async (e) => {
   e.target.disabled = true; prog.textContent = 'Lade …';
@@ -254,7 +295,7 @@ const send = () => { const t = sayIn.value; sayIn.value = ''; chat.say(t); };
 document.getElementById('send').onclick = send; sayIn.onkeydown = (e) => { if (e.key === 'Enter') send(); };
 const mic = document.getElementById('mic');
 const listener = new Listener((t) => chat.say(t), (s) => { if (s) prog.textContent = s; });
-if (!listener.ok) { mic.disabled = true; mic.textContent = '🎤 nicht verfügbar (bitte Chrome nutzen)'; }
+if (!listener.ok) { mic.disabled = true; mic.textContent = noMic; }
 const micDown = () => { chat.stop(); avatar.setEmotion('neutral'); avatar.earTarget = [.7, 0]; mic.classList.add('rec'); listener.start(); };
 const micUp = () => { mic.classList.remove('rec'); listener.stop(); avatar.earTarget = [0, 0]; };
 mic.onpointerdown = micDown; mic.onpointerup = micUp; mic.onpointerleave = () => { if (listener.active) micUp(); };
