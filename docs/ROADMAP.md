@@ -13,6 +13,9 @@ Avatar mit Mimik/Lippensynchronität/Ohren, Sprechen (Browser-TTS oder Piper-Sti
 4. **Desktop-Apps (Mac, Windows, Linux)** – siehe unten.
 5. Mehr Körperanimationen (Mixamo: Idle, Winken, Tanzen), bessere Lippensynchronität (Phonemzeiten aus Piper statt Textheuristik).
 
+## Desktop-Apps: Stand
+Mac-Testversion mit Electron 44 (`desktop/`, Build per GitHub Actions auf macOS, nur ad-hoc signiert, keine Apple-Beglaubigung). Lokaler Server auf festem Port 47831 → feste Herkunft für IndexedDB/Cache (Gedächtnis, Stimmen, Modelle bleiben erhalten). Offen: Whisper-Spracheingabe, Apple-Developer-Signatur + Notarisierung, Updates über GitHub Pages, Windows/Linux-Builds.
+
 ## Desktop-Apps: Entscheidungsgrundlage
 Ziel: dieselbe Web-App (`web/`) in einer Hülle, Update über den vorhandenen Updater (Code klein, Daten einmalig).
 

@@ -9,6 +9,11 @@ Sprechender 3D-Fennek (Pixar-Stil) für Kinder-Software: Mimik, Lippensynchronit
 **Lokal:** Repo herunterladen und `start.command` (Mac, Doppelklick), `start.bat` (Windows) oder `./start.sh` (Linux) starten – öffnet `http://localhost:8765/`. Alternativ: `cd web && python3 -m http.server 8765`.
 Wichtig: nicht per Doppelklick auf `index.html` öffnen (Browser sperren dann Module/Modelle). Spracheingabe und Sprachmodell (WebGPU) brauchen Chrome oder Edge.
 
+**Mac-App (Testversion):** Unter *Actions → „Mac-App bauen“* den neuesten Lauf öffnen und unten *Finn-Mac-AppleSilicon* (M1/M2/M3/M4) bzw. *Finn-Mac-Intel* herunterladen. ZIP entpacken, DMG öffnen, *Finn* in *Programme* ziehen.
+Die App ist nicht von Apple beglaubigt. Beim ersten Start daher: Rechtsklick auf *Finn* → *Öffnen*. Klappt das nicht: *Systemeinstellungen → Datenschutz & Sicherheit → „Dennoch öffnen“*, oder im Terminal `xattr -dr com.apple.quarantine /Applications/Finn.app`.
+In der App funktioniert die Spracheingabe noch nicht (dafür braucht es lokales Whisper), Tippen geht. Alles andere – Stimmen, Sprachmodell, Gedächtnis – wie im Browser.
+Selbst starten ohne Build: `cd desktop && npm install && npm start`.
+
 ## Erste Schritte in der App
 1. *Fennek-Stimme laden* (einmalig ca. 130 MB, danach offline).
 2. *Modell laden* im Bereich Gespräch (einmalig 0,4–1,2 GB je Modell).
@@ -24,6 +29,7 @@ Neue Version veröffentlichen = Änderungen nach `main` pushen.
 
 ## Aufbau
 - `web/` – die App (statisch): `index.html`, `avatar.js` (Avatar), `chat.js` (Gespräch/LLM/Spracherkennung), `memory.js` (Gedächtnis/Kennenlernen/Nachfragen), `tts.js` (Piper-Stimmen), `learn.js` (Englisch-Trainer), `updater.js` + `sw.js` (Updates/Offline), `lib/` (three.js, WebLLM, ONNX/Piper), `fennec_avatar.glb`, `atlas_meta.json`.
+- `desktop/` – Electron-Hülle für Mac (später Windows/Linux): `main.js` liefert `web/` über `http://127.0.0.1:47831` aus; Build per `.github/workflows/mac-app.yml`.
 - `tools/avatar-pipeline/` – Python/Blender-Skripte, die aus dem Meshy-Modell den Avatar bauen (siehe dort).
 - `tools/make-manifest.mjs` – erzeugt `web/manifest.json`.
 - `source/` – Ausgangsmodell von Meshy.

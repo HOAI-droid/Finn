@@ -242,7 +242,9 @@ $('lstart').onclick = () => { $('lanswer').style.display = ''; trainer.start(lto
 $('lcheck').onclick = () => trainer.answer($('lin').value, false);
 $('lin').onkeydown = (e) => { if (e.key === 'Enter') trainer.answer($('lin').value, false); };
 $('lrepeat').onclick = () => trainer.repeat(); $('lskip').onclick = () => trainer.skip(); $('lstop').onclick = () => trainer.stop();
-const lm = $('lmic'); if (!lis.ok) { lm.disabled = true; lm.textContent = '🎤 nicht verfügbar (bitte Chrome)'; }
+const isApp = navigator.userAgent.includes('Electron'), noMic = isApp ? '🎤 in der App noch nicht – bitte tippen' : '🎤 nicht verfügbar (bitte Chrome)';
+const lm = $('lmic'); if (!lis.ok) { lm.disabled = true; lm.textContent = noMic; }
+if (!lis.ok) { $('lmode').querySelectorAll('option[value=mix],option[value=speak]').forEach(o => o.remove()); $('lmode').value = 'type'; }   // ohne Mikrofon nur Tippen/Hören
 lm.onpointerdown = () => { avatar.stopSpeaking(); avatar.earTarget = [.7, 0]; lm.classList.add('rec'); lis.start(); };
 lm.onpointerup = () => { lm.classList.remove('rec'); lis.stop(); avatar.earTarget = [0, 0]; };
 lm.onpointerleave = () => { if (lis.active) { lm.classList.remove('rec'); lis.stop(); } };
@@ -293,7 +295,7 @@ const send = () => { const t = sayIn.value; sayIn.value = ''; chat.say(t); };
 document.getElementById('send').onclick = send; sayIn.onkeydown = (e) => { if (e.key === 'Enter') send(); };
 const mic = document.getElementById('mic');
 const listener = new Listener((t) => chat.say(t), (s) => { if (s) prog.textContent = s; });
-if (!listener.ok) { mic.disabled = true; mic.textContent = '🎤 nicht verfügbar (bitte Chrome nutzen)'; }
+if (!listener.ok) { mic.disabled = true; mic.textContent = noMic; }
 const micDown = () => { chat.stop(); avatar.setEmotion('neutral'); avatar.earTarget = [.7, 0]; mic.classList.add('rec'); listener.start(); };
 const micUp = () => { mic.classList.remove('rec'); listener.stop(); avatar.earTarget = [0, 0]; };
 mic.onpointerdown = micDown; mic.onpointerup = micUp; mic.onpointerleave = () => { if (listener.active) micUp(); };

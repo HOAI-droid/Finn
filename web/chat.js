@@ -173,7 +173,8 @@ export class FennecChat {
 // ---------------------------------------------------------------- Spracherkennung (Browser)
 export class Listener {
   constructor(onText, onState = () => {}, lang = 'de-DE') {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    // In der Desktop-App (Electron) fehlt der Google-Dienst dahinter -> dort (noch) keine Spracheingabe
+    const SR = navigator.userAgent.includes('Electron') ? null : window.SpeechRecognition || window.webkitSpeechRecognition;
     this.ok = !!SR; this.onText = onText; this.onState = onState; this.active = false;
     if (!SR) return;
     const r = this.rec = new SR(); r.lang = lang; r.interimResults = true; r.continuous = false; r.maxAlternatives = 1;

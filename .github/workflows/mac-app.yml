@@ -1,0 +1,38 @@
+name: Mac-App bauen
+on:
+  push:
+    paths: ['desktop/**', 'web/**', '.github/workflows/mac-app.yml']
+  workflow_dispatch:
+permissions: { contents: read }
+jobs:
+  mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: desktop/package-lock.json }
+      - name: Abhängigkeiten
+        working-directory: desktop
+        run: npm ci
+      - name: App bauen (Apple Silicon + Intel)
+        working-directory: desktop
+        env: { CSC_IDENTITY_AUTO_DISCOVERY: 'false' }
+        run: npx electron-builder --mac --dir --arm64 --x64 -p never -c.mac.identity=null
+      - name: Ad-hoc signieren und DMG erstellen
+        working-directory: desktop/dist
+        run: |
+          set -e
+          V=$(node -p "require('../package.json').version")
+          for d in mac-arm64:arm64 mac:intel; do
+            dir=${d%%:*}; arch=${d##*:}
+            app="$dir/Finn.app"
+            codesign --force --deep --sign - "$app"
+            codesign --verify --deep --strict "$app"
+            mkdir -p "stage-$arch" && cp -R "$app" "stage-$arch/" && ln -s /Applications "stage-$arch/Programme"
+            hdiutil create -volname "Finn" -srcfolder "stage-$arch" -ov -format UDZO "Finn-$V-$arch.dmg"
+          done
+          ls -lh *.dmg
+      - uses: actions/upload-artifact@v4
+        with: { name: Finn-Mac-AppleSilicon, path: 'desktop/dist/Finn-*-arm64.dmg', retention-days: 30 }
+      - uses: actions/upload-artifact@v4
+        with: { name: Finn-Mac-Intel, path: 'desktop/dist/Finn-*-intel.dmg', retention-days: 30 }
